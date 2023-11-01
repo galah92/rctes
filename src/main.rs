@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use serde::Deserialize;
@@ -22,6 +22,7 @@ async fn main() -> Result<(), sqlx::Error> {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/clicked", post(clicked))
         .route("/location", get(location))
         .route("/healthcheck", get(|| async { StatusCode::OK }))
         .with_state(state)
@@ -46,10 +47,12 @@ struct AppState {
 async fn index(
     Query(query): Query<IndexParams>,
     State(AppState { pool, .. }): State<AppState>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, StatusCode> {
     let name = query.name.unwrap_or_else(|| "World".to_string());
-    let locations = db::get_all_locations(&pool).await.unwrap();
-    Index { name, locations }.into_response()
+    let locations = db::get_all_locations(&pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(Index { name, locations })
 }
 
 #[derive(Deserialize)]
@@ -64,28 +67,36 @@ struct Index {
     locations: Vec<db::Location>,
 }
 
+async fn clicked() -> impl IntoResponse {
+    Clicked {}.into_response()
+}
+
+#[derive(Template)]
+#[template(path = "clicked.html")]
+struct Clicked {}
+
 async fn location(
     Query(query): Query<LocationParams>,
     State(AppState { pool, .. }): State<AppState>,
-) -> impl IntoResponse {
-    let Some(name) = query.name else {
-        return StatusCode::BAD_REQUEST.into_response();
-    };
+) -> Result<impl IntoResponse, StatusCode> {
+    let name = query.name.ok_or(StatusCode::BAD_REQUEST)?;
 
-    let location = db::get_location(&pool, &name).await.unwrap();
-    let Some(location) = location else {
-        return StatusCode::NOT_FOUND.into_response();
-    };
-    let population = location.population;
+    let location = db::get_location(&pool, &name)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let parents = db::get_parents(&pool, &name).await.unwrap();
+    let population = location.ok_or(StatusCode::NOT_FOUND)?.population;
+
+    let parents = db::get_parents(&pool, &name)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let template = Location {
         name,
         population,
         parents,
     };
-    template.into_response()
+    Ok(template)
 }
 
 #[derive(Deserialize)]
