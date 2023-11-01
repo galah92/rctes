@@ -9,9 +9,7 @@ use axum::{
     Router,
 };
 use serde::Deserialize;
-use sqlx::postgres::PgPoolOptions;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 use tower_http::services::ServeDir;
 
 #[tokio::main]
@@ -20,7 +18,7 @@ async fn main() -> Result<(), sqlx::Error> {
         .connect("postgres://postgres:postgres@localhost:5432/postgres")
         .await?;
 
-    let state = Arc::new(RwLock::new(AppState { pool }));
+    let state = AppState { pool };
 
     let app = Router::new()
         .route("/", get(index))
@@ -40,19 +38,17 @@ async fn main() -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-type SharedState = Arc<RwLock<AppState>>;
-
+#[derive(Clone)]
 struct AppState {
-    pool: sqlx::PgPool,
+    pool: PgPool,
 }
 
 async fn index(
     Query(query): Query<IndexParams>,
-    State(state): State<SharedState>,
+    State(AppState { pool, .. }): State<AppState>,
 ) -> impl IntoResponse {
-    let pool = &state.read().await.pool;
     let name = query.name.unwrap_or_else(|| "World".to_string());
-    let locations = db::get_all_locations(pool).await.unwrap();
+    let locations = db::get_all_locations(&pool).await.unwrap();
     Index { name, locations }.into_response()
 }
 
@@ -70,20 +66,19 @@ struct Index {
 
 async fn location(
     Query(query): Query<LocationParams>,
-    State(state): State<SharedState>,
+    State(AppState { pool, .. }): State<AppState>,
 ) -> impl IntoResponse {
     let Some(name) = query.name else {
         return StatusCode::BAD_REQUEST.into_response();
     };
 
-    let pool = &state.read().await.pool;
-    let location = db::get_location(pool, &name).await.unwrap();
+    let location = db::get_location(&pool, &name).await.unwrap();
     let Some(location) = location else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let population = location.population;
 
-    let parents = db::get_parents(pool, &name).await.unwrap();
+    let parents = db::get_parents(&pool, &name).await.unwrap();
 
     let template = Location {
         name,
