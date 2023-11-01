@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>rctes</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script defer src="/assets/scripts.js"></script>
+</head>
+
+<body>
+    <div>
+        <div>
+            <div>
+                <h1>Test</h1>
+                <p>{{ name }}</p>
+            </div>
+        </div>
+        <a href="/location">Location</a>
+        <table>
+            <thead>
+                <tr>
+                    <th>name</th>
+                    <th>population</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for location in locations %}
+                <tr>
+                    <td>{{ location.name }}</td>
+                    <td>{{ location.population }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+
+</html>
