@@ -11,41 +11,43 @@
 </head>
 
 <body>
-    <div>
-        <div>
-            <div>
-                <h1>Test</h1>
-                <p>{{ name }}</p>
-            </div>
-        </div>
-        <form hx-post="/location">
+    <header>
+        <h1>Hello</h1>
+        <span>{{ name }}</span>
+    </header>
+    <br />
+    <button hx-post="/clicked" hx-swap="outerHTML">
+        Click Me
+    </button>
+    <br />
+    <br />
+    <form hx-post="/location">
+        <fieldset>
+            <label for="name">Name</label>
             <input type="text" name="name" />
+            <label for="population">Population</label>
             <input type="number" name="population" />
             <button type="submit">Submit</button>
-        </form>
-        <button hx-post="/clicked" hx-swap="outerHTML">
-            Click Me
-        </button>
-        <br />
-        <br />
-        <a href="/location">Location</a>
-        <table>
-            <thead>
-                <tr>
-                    <th>name</th>
-                    <th>population</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for location in locations %}
-                <tr>
-                    <td>{{ location.name }}</td>
-                    <td>{{ location.population }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        </fieldset>
+    </form>
+    <br />
+    <a href="/location">Location</a>
+    <table>
+        <thead>
+            <tr>
+                <th>name</th>
+                <th>population</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for location in locations %}
+            <tr>
+                <td>{{ location.name }}</td>
+                <td>{{ location.population }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 
 </html>
