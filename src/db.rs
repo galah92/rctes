@@ -1,10 +1,25 @@
 use sqlx::PgPool;
 
-#[derive(sqlx::FromRow, Debug)]
+#[derive(sqlx::FromRow, Debug, Clone)]
 pub struct Location {
     pub name: String,
     pub population: i64,
     pub parent: Option<String>,
+}
+
+pub async fn create_location(pool: &PgPool, location: &Location) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+INSERT INTO locations (name, population, parent)
+VALUES ($1, $2, $3)
+    "#,
+        location.name,
+        location.population,
+        location.parent
+    )
+    .execute(pool)
+    .await?;
+    Ok(())
 }
 
 pub async fn get_all_locations(pool: &PgPool) -> Result<Vec<Location>, sqlx::Error> {

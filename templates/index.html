@@ -18,6 +18,11 @@
                 <p>{{ name }}</p>
             </div>
         </div>
+        <form hx-post="/location">
+            <input type="text" name="name" />
+            <input type="number" name="population" />
+            <button type="submit">Submit</button>
+        </form>
         <button hx-post="/clicked" hx-swap="outerHTML">
             Click Me
         </button>

@@ -6,7 +6,7 @@ use axum::{
     http::{Request, StatusCode},
     response::IntoResponse,
     routing::{get, post},
-    Router,
+    Form, Router,
 };
 use serde::Deserialize;
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -20,13 +20,13 @@ use uuid::Uuid;
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
     tracing_subscriber::fmt()
-        .json()
+        // .json()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
 
-    let pool = PgPoolOptions::new()
-        .connect("postgres://postgres:postgres@localhost:5432/postgres")
-        .await?;
+    let db_url = std::env::var("DATABASE_URL")
+        .unwrap_or("postgres://postgres:postgres@localhost:5432/postgres".into());
+    let pool = PgPoolOptions::new().connect(&db_url).await?;
 
     let state = AppState { pool };
 
@@ -48,6 +48,7 @@ async fn main() -> Result<(), sqlx::Error> {
     let app = Router::new()
         .route("/", get(index))
         .route("/clicked", post(clicked))
+        .route("/location", post(create_location))
         .route("/location", get(location))
         .route("/healthcheck", get(|| async { StatusCode::OK }))
         .with_state(state)
@@ -68,6 +69,30 @@ async fn main() -> Result<(), sqlx::Error> {
 #[derive(Clone)]
 struct AppState {
     pool: PgPool,
+}
+
+async fn create_location(
+    State(AppState { pool, .. }): State<AppState>,
+    Form(query): Form<CreateLocationParams>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let location = db::Location {
+        name: query.name.ok_or(StatusCode::BAD_REQUEST)?,
+        population: query.population.ok_or(StatusCode::BAD_REQUEST)?,
+        parent: query.parent,
+    };
+
+    db::create_location(&pool, &location)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(StatusCode::CREATED)
+}
+
+#[derive(Deserialize)]
+struct CreateLocationParams {
+    name: Option<String>,
+    population: Option<i64>,
+    parent: Option<String>,
 }
 
 async fn index(
