@@ -3,22 +3,47 @@ mod db;
 use askama::Template;
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{Request, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
 use serde::Deserialize;
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use tower_http::services::ServeDir;
+use tower_http::{
+    services::ServeDir,
+    trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
+};
+use tracing_subscriber::EnvFilter;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
+    tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
+
     let pool = PgPoolOptions::new()
         .connect("postgres://postgres:postgres@localhost:5432/postgres")
         .await?;
 
     let state = AppState { pool };
+
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(|request: &Request<_>| {
+            let request_id = Uuid::new_v4();
+            tracing::info_span!(
+                "request",
+                method = %request.method(),
+                path = %request.uri().path(),
+                uri = %request.uri(),
+                version = ?request.version(),
+                request_id = %request_id,
+            )
+        })
+        .on_request(DefaultOnRequest::default().level(tracing::Level::INFO))
+        .on_response(DefaultOnResponse::default().level(tracing::Level::INFO));
 
     let app = Router::new()
         .route("/", get(index))
@@ -26,10 +51,11 @@ async fn main() -> Result<(), sqlx::Error> {
         .route("/location", get(location))
         .route("/healthcheck", get(|| async { StatusCode::OK }))
         .with_state(state)
-        .nest_service("/assets", ServeDir::new("assets"));
+        .nest_service("/assets", ServeDir::new("assets"))
+        .layer(trace_layer);
 
     let addr = "127.0.0.1:3000".parse().unwrap();
-    println!("Listening on {}", addr);
+    tracing::info!("Listening on {}", addr);
 
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -48,6 +74,7 @@ async fn index(
     Query(query): Query<IndexParams>,
     State(AppState { pool, .. }): State<AppState>,
 ) -> Result<impl IntoResponse, StatusCode> {
+    tracing::info!("WIP");
     let name = query.name.unwrap_or_else(|| "World".to_string());
     let locations = db::get_all_locations(&pool)
         .await
@@ -55,7 +82,7 @@ async fn index(
     Ok(Index { name, locations })
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct IndexParams {
     name: Option<String>,
 }
