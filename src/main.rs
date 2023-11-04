@@ -77,6 +77,14 @@ struct AppState {
     pool: PgPool,
 }
 
+impl From<db::DbError> for StatusCode {
+    fn from(error: db::DbError) -> Self {
+        match error {
+            db::DbError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 async fn create_location(
     State(AppState { pool, .. }): State<AppState>,
     Form(query): Form<CreateLocationParams>,
@@ -86,11 +94,7 @@ async fn create_location(
         population: query.population.ok_or(StatusCode::BAD_REQUEST)?,
         parent: query.parent,
     };
-
-    db::create_location(&pool, &location)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
+    db::create_location(&pool, &location).await?;
     Ok(StatusCode::CREATED)
 }
 
@@ -105,11 +109,8 @@ async fn index(
     Query(query): Query<IndexParams>,
     State(AppState { pool, .. }): State<AppState>,
 ) -> Result<impl IntoResponse, StatusCode> {
-    tracing::info!("WIP");
     let name = query.name.unwrap_or_else(|| "World".to_string());
-    let locations = db::get_all_locations(&pool)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let locations = db::get_all_locations(&pool).await?;
     Ok(Index { name, locations })
 }
 
@@ -126,7 +127,7 @@ struct Index {
 }
 
 async fn clicked() -> impl IntoResponse {
-    Clicked {}.into_response()
+    Clicked {}
 }
 
 #[derive(Template)]
@@ -138,16 +139,9 @@ async fn location(
     State(AppState { pool, .. }): State<AppState>,
 ) -> Result<impl IntoResponse, StatusCode> {
     let name = query.name.ok_or(StatusCode::BAD_REQUEST)?;
-
-    let location = db::get_location(&pool, &name)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
+    let location = db::get_location(&pool, &name).await?;
     let population = location.ok_or(StatusCode::NOT_FOUND)?.population;
-
-    let parents = db::get_parents(&pool, &name)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let parents = db::get_parents(&pool, &name).await?;
 
     let template = Location {
         name,

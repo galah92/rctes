@@ -1,5 +1,15 @@
 use sqlx::PgPool;
 
+pub enum DbError {
+    Other(sqlx::Error),
+}
+
+impl From<sqlx::Error> for DbError {
+    fn from(error: sqlx::Error) -> Self {
+        DbError::Other(error)
+    }
+}
+
 #[derive(sqlx::FromRow, Debug, Clone)]
 pub struct Location {
     pub name: String,
@@ -7,7 +17,7 @@ pub struct Location {
     pub parent: Option<String>,
 }
 
-pub async fn create_location(pool: &PgPool, location: &Location) -> Result<(), sqlx::Error> {
+pub async fn create_location(pool: &PgPool, location: &Location) -> Result<(), DbError> {
     sqlx::query!(
         r#"
 INSERT INTO locations (name, population, parent)
@@ -22,7 +32,7 @@ VALUES ($1, $2, $3)
     Ok(())
 }
 
-pub async fn get_all_locations(pool: &PgPool) -> Result<Vec<Location>, sqlx::Error> {
+pub async fn get_all_locations(pool: &PgPool) -> Result<Vec<Location>, DbError> {
     let locations = sqlx::query_as!(
         Location,
         r#"
@@ -35,7 +45,7 @@ FROM locations
     Ok(locations)
 }
 
-pub async fn get_location(pool: &PgPool, location: &str) -> Result<Option<Location>, sqlx::Error> {
+pub async fn get_location(pool: &PgPool, location: &str) -> Result<Option<Location>, DbError> {
     let location = sqlx::query_as!(
         Location,
         r#"
@@ -50,7 +60,7 @@ WHERE name = $1
     Ok(location)
 }
 
-pub async fn get_parents(pool: &PgPool, location: &str) -> Result<Vec<String>, sqlx::Error> {
+pub async fn get_parents(pool: &PgPool, location: &str) -> Result<Vec<String>, DbError> {
     #[derive(sqlx::FromRow, Default)]
     struct Parents {
         #[allow(dead_code)]
