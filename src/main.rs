@@ -32,7 +32,13 @@ async fn main() -> Result<(), sqlx::Error> {
 
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(|request: &Request<_>| {
-            let request_id = Uuid::new_v4();
+            let request_id = request
+                .headers()
+                .get("x-request-id")
+                .and_then(|value| value.to_str().ok())
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| Uuid::new_v4().to_string());
+
             tracing::info_span!(
                 "request",
                 method = %request.method(),
