@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nSELECT name, population, parent\nFROM locations\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "population",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "parent",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "b6e636ca073d9da8cf701fad60ff32fa55c813574b60750e878b0ada21858c16"
+}

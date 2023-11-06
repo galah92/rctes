@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\nWITH RECURSIVE locations_cte(name, parent, parents) AS (\n  SELECT\n    locations.name, \n    locations.parent,\n    ARRAY[locations.name::TEXT] as parents\n  FROM\n    locations\n  WHERE\n    locations.name = $1\n  UNION ALL\n  SELECT\n    locations.name, \n    locations.parent,\n    ARRAY_APPEND(locations_cte.parents, locations.name::TEXT)\n  FROM\n    locations_cte,\n    locations\n  WHERE\n    locations.name = locations_cte.parent\n)\nSELECT\n  parents\nFROM\n  locations_cte\nWHERE\n  parent IS NULL\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "parents",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "70425b04c6d5c9af4f5e88ef96a00ac862893693d9929ee0b7bd352d1b4a6478"
+}
