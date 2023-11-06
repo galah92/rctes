@@ -2,12 +2,16 @@ mod db;
 
 use askama::Template;
 use axum::{
-    extract::{Query, State},
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        Query, State,
+    },
     http::{Request, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Form, Router,
 };
+use futures::{sink::SinkExt, stream::StreamExt};
 use serde::Deserialize;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use tower_http::{
@@ -53,6 +57,7 @@ async fn main() -> Result<(), sqlx::Error> {
 
     let app = Router::new()
         .route("/", get(index))
+        .route("/counter", get(counter))
         .route("/clicked", post(clicked))
         .route("/location", post(create_location))
         .route("/location", get(location))
@@ -124,6 +129,30 @@ struct IndexParams {
 struct Index {
     name: String,
     locations: Vec<db::Location>,
+}
+
+async fn counter(ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(|socket: WebSocket| async move {
+        let (mut tx, _) = socket.split();
+
+        let mut count = 0usize;
+        loop {
+            let counter = Counter { count };
+            let message = Message::Text(counter.render().unwrap());
+            if let Err(error) = tx.send(message).await {
+                tracing::warn!("Failed to send message: {}", error);
+                break;
+            }
+            count += 1;
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+    })
+}
+
+#[derive(Template)]
+#[template(path = "counter.html")]
+struct Counter {
+    count: usize,
 }
 
 async fn clicked() -> impl IntoResponse {
