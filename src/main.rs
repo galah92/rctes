@@ -7,7 +7,7 @@ use axum::{
         Query, State,
     },
     http::{Request, StatusCode},
-    response::IntoResponse,
+    response::{Html, IntoResponse, Response},
     routing::{get, post},
     Form, Router,
 };
@@ -66,13 +66,10 @@ async fn main() -> Result<(), sqlx::Error> {
         .nest_service("/assets", ServeDir::new("assets"))
         .layer(trace_layer);
 
-    let addr = "127.0.0.1:3000".parse().unwrap();
+    let addr = "127.0.0.1:3000";
     tracing::info!("Listening on {}", addr);
-
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
@@ -116,7 +113,24 @@ async fn index(
 ) -> Result<impl IntoResponse, StatusCode> {
     let name = query.name.unwrap_or_else(|| "World".to_string());
     let locations = db::get_all_locations(&pool).await?;
-    Ok(Index { name, locations })
+    Ok(HtmlTemplate(Index { name, locations }))
+}
+
+struct HtmlTemplate<T>(T);
+
+impl<T> IntoResponse for HtmlTemplate<T>
+where
+    T: Template,
+{
+    fn into_response(self) -> Response {
+        match self.0.render() {
+            Ok(html) => Html(html).into_response(),
+            Err(error) => {
+                tracing::error!("Failed to render template: {}", error);
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -156,7 +170,7 @@ struct Counter {
 }
 
 async fn clicked() -> impl IntoResponse {
-    Clicked {}
+    HtmlTemplate(Clicked {})
 }
 
 #[derive(Template)]
@@ -177,7 +191,7 @@ async fn location(
         population,
         parents,
     };
-    Ok(template)
+    Ok(HtmlTemplate(template))
 }
 
 #[derive(Deserialize)]
