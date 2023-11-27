@@ -82,6 +82,7 @@ struct AppState {
 impl From<db::DbError> for StatusCode {
     fn from(error: db::DbError) -> Self {
         match error {
+            db::DbError::NotFound => StatusCode::NOT_FOUND,
             db::DbError::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

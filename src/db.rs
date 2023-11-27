@@ -1,12 +1,16 @@
 use sqlx::PgPool;
 
 pub enum DbError {
+    NotFound,
     Other(sqlx::Error),
 }
 
 impl From<sqlx::Error> for DbError {
     fn from(error: sqlx::Error) -> Self {
-        DbError::Other(error)
+        match error {
+            sqlx::Error::RowNotFound => DbError::NotFound,
+            _ => DbError::Other(error),
+        }
     }
 }
 
